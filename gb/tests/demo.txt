@@ -1,0 +1,65 @@
+# FM-GB in the host simulator with its own test cartridge (gb/tools/mkdemo.py): the pad, the sound, a battery save
+# kept across a power cycle, a save state. Run by gb/tests/run.sh (it makes the cartridge and points FM1GB_ROM at it).
+wait 1500
+expect running 1
+expect under 0
+shot demo_boot.png
+# the pad: B3 is RIGHT; the block's x is at 0xC000 (80 at the start)
+key 6 down
+wait 500
+key 6 up
+wait 100
+expect gbx >100
+# START (G4, the key) twice: the counter in the cartridge's RAM, saved to the flash soon after
+tapkey 14
+wait 300
+tapkey 14
+wait 1500
+expect count 2
+expect saves >0
+# A: a beep, heard
+master 4096
+wav out:demo_beep.wav
+peakreset
+tapkey 24
+wait 300
+wavstop
+expect peak_db_max >-20
+shot demo_play.png
+# a quick save state, the counter moved on, then the state loaded
+tap SAVE
+wait 500
+expect state 1
+tapkey 14
+wait 800
+expect count 3
+tap HOME
+wait 200
+expect menu 1
+spin SELECT 5
+wait 100
+tap PLAY
+wait 600
+expect menu 0
+expect count 2
+# the menu: the palette and the screen
+tap HOME
+wait 200
+spin SELECT 1
+wait 50
+tap PLAY
+wait 50
+expect palette 1
+tap HOME
+wait 300
+expect menu 0
+# power off and on: the battery save is back
+tapkey 14
+wait 1500
+expect count 3
+power
+wait 1500
+expect running 1
+expect count 3
+expect palette 1
+shot demo_after_power.png

@@ -1,0 +1,21 @@
+# FM-GB's build settings (tools/build.py gb). The game is added to the package afterwards (tools/fm1gb.py, or the
+# install page): one build of the emulator, any ROM the player owns.
+name = "FM-GB"
+id_prefix = "FM-1_47"            # package identity: dev FM-1_4700, releases FM-1_47XXYYZZ
+usb_manufacturer = "fm1-gb"
+usb_product = "FM-GB"
+o2 = ["core/gb.c", "fast.c"]     # the emulator and the screen's conversions at -O2
+words = "words.tsv"
+ble = false                      # no radio: the RAM and the flash are the game's
+app_end = 0xE0000                # the biggest app slot (877 KiB): the code, then the player's ROM at its end
+# the site and firmware.json (docs/FIRMWARE-JSON.md)
+tagline = "a Game Boy in your FM-1"
+repo = "https://github.com/josh-mcfarlin/fm1-gb"
+install = "https://josh-mcfarlin.github.io/fm1-gb/"   # the install page (gb/tools/site.py, the fm-gb workflow)
+site = "https://josh-mcfarlin.github.io/fm1-gb/"
+licence = "MPL-2.0"
+credits = "Built on fm1-base and felucca-bsp. Bring your own game: no ROM is included."
+author = "The fm1-gb authors"
+description = "An original Game Boy (DMG) emulator for the FM-1. The keys are the pad and the buttons, the screen shows the game at 1.5x, battery saves are kept in the flash, and save states, palettes and fast forward are a button away. You add your own ROM when you install it."
+tags = ["game"]
+screenshot = "docs/img/screen-game.png"   # (relative to gb/; firmware.json)

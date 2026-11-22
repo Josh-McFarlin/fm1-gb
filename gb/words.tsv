@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MPL-2.0
+# FM-GB's words for a screen reader (fm1-reader): the text on the screen <TAB> what to say.
+# url: https://josh-mcfarlin.github.io/fm1-gb/words/
+FM-GB	F M G B
+RESUME	resume
+PALETTE	palette
+SCREEN	screen
+SPEED METER	speed meter
+SAVE STATE	save state
+LOAD STATE	load state
+RESET GAME	reset game
+CONTROLS	controls
