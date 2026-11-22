@@ -1,3 +1,9 @@
+# fm1-gb
+
+**This repository is fm1-base with FM-GB in it: a Game Boy (DMG) emulator firmware for the FM-1, in [`gb/`](gb/README.md).**
+You install it with your own ROM: choose it on the install page, or `python3 gb/tools/fm1gb.py install`. See
+[gb/README.md](gb/README.md). fm1-base's own README follows.
+
 # fm1-base
 
 A base for M-VAVE FM-1 firmware, on [felucca-bsp](https://github.com/hugelton/felucca-bsp): the platform layer
