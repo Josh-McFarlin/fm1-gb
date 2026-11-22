@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-# tools/fm1_install.py, fm1_remote.py, fm1_debug.py, fm1_backup.py, fm1_mirror.py, fm1ports.py: MIDI to an FM-1
+# tools/fm1_install.py, fm1_remote.py, fm1ports.py: MIDI to an FM-1
 # (python-rtmidi builds against ALSA's headers on Linux: libasound2-dev).
 device = [
     "mido==1.3.3",

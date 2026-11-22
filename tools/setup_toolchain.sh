@@ -3,8 +3,7 @@
 # Copyright (C) 2026 Drew Robinson
 # Fetch everything the build needs into the repository, pinned: nothing is installed in $HOME, and nothing runs that
 # isn't in tools/toolchain.lock. Every download is checked against the lock (SHA-256 for files, the commit for git)
-# before it is unpacked; a mismatch stops the script. tools/get_toolchain.sh remains the quick way to the JieLi
-# toolchain alone. After ESTAMPIE's tools/setup_toolchain.sh (Drew Robinson), offered to fm1-base under MPL-2.0.
+# before it is unpacked; a mismatch stops the script. After ESTAMPIE's tools/setup_toolchain.sh (Drew Robinson), offered to fm1-base under MPL-2.0.
 #   .toolchain/jieli       JieLi's Linux toolchain (clang 4.0.1 for pi32v2); tools/build.py finds it here when
 #                          JIELI_TOOLCHAIN is unset
 #   .toolchain/ac79-sdk    the three files of the JieLi AC79 SDK that go into every package (a sparse checkout;
@@ -13,14 +12,12 @@
 #   .toolchain/bin         osv-scanner (tools/osv_scan.sh)
 #   .toolchain/uv          uv, where none is installed (a fresh CI runner): it makes .venv
 #   .venv                  Python with the packages in uv.lock (uv sync --frozen; pyproject.toml says why these)
-#   .toolchain/fm1-reader  fm1-reader at its pinned commit, when there is no checkout next to this repository (the
-#                          emulator page's screen reader: tools/build.py --web)
 # A step is skipped when its folder already holds the pinned version; change a pin and run it again to update.
-# --only takes a comma-separated list of steps (jieli, ac79-sdk, node, python, osv-scanner, fm1-reader, uv): CI fetches
+# --only takes a comma-separated list of steps (jieli, ac79-sdk, node, python, osv-scanner, uv): CI fetches
 # just what a job needs through the same checks.
 #   tools/setup_toolchain.sh [--only STEP,...]
 set -eu
-STEPS=jieli,ac79-sdk,node,python,osv-scanner,fm1-reader
+STEPS=jieli,ac79-sdk,node,python,osv-scanner
 USAGE="usage: tools/setup_toolchain.sh [--only STEP,...]"
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -166,12 +163,6 @@ if want osv-scanner; then
         chmod 755 $TC/bin/osv-scanner
         echo "$2" > $TC/bin/osv-scanner.pin
     fi
-fi
-
-# fm1-reader at its pinned commit (MIT; its voice GPL-3.0-or-later), when no checkout sits next to this repo.
-if want fm1-reader && [ ! -f ../fm1-reader/web/words.js ]; then
-    set -- $(pin fm1-reader)
-    checkout $TC/fm1-reader "$1" "$2" "$3"
 fi
 
 echo "setup_toolchain: done in $ROOT (tools/build.py gb, gb/tests/run.sh, tools/osv_scan.sh)"

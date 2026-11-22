@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Charles Vestal
-"""Finding FM-1s on USB-MIDI from Python, as web/fm1ports.js does in the browser: for tools/fm1_install.py (and
-through it fm1_backup.py and fm1_mirror.py), fm1_remote.py and fm1_debug.py. Needs mido with python-rtmidi.
+"""Finding FM-1s on USB-MIDI from Python, as web/fm1ports.js does in the browser: for tools/fm1_install.py and
+fm1_remote.py. Needs mido with python-rtmidi.
 
 A port is taken when its name is an FM-1's usual one (PORT_RE, fm1ports.js PORT_NAMES). Otherwise the other ports are
 asked with the screen reader's HELLO (fm1-reader PROTOCOL.md: F0 7D 53 52 01 01 F7; 7D is the ID for non-commercial

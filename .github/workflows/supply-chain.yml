@@ -1,7 +1,7 @@
 # The supply-chain checks on every pull request, weekly (so a vulnerability published after a dependency was locked
 # still turns up), and on a push that changes a pin, a scan or a workflow; not on every push, since new Debian findings
 # land most weeks and would turn unrelated pushes red: osv-scanner (pinned by SHA-256 in tools/toolchain.lock) over
-# uv.lock, the Node line, the pinned build image and eSpeak NG (the emulator page's voice); zizmor (pinned in uv.lock)
+# uv.lock, the Node line and the pinned build image; zizmor (pinned in uv.lock)
 # over these workflows: pinning, permissions, injection, impostor commits. After ESTAMPIE's supply-chain.yml (Drew
 # Robinson), offered under MPL-2.0.
 name: supply chain
@@ -43,11 +43,11 @@ jobs:
 
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2   # v10.3.3
 
-      - name: osv-scanner and fm1-reader (checked against tools/toolchain.lock)
-        run: tools/setup_toolchain.sh --only osv-scanner,fm1-reader
+      - name: osv-scanner (checked against tools/toolchain.lock)
+        run: tools/setup_toolchain.sh --only osv-scanner
 
-      - name: Known vulnerabilities (Python, Node, build image, eSpeak NG)
-        run: tools/osv_scan.sh python node build-image espeak
+      - name: Known vulnerabilities (Python, Node, build image)
+        run: tools/osv_scan.sh python node build-image
 
       - name: Workflow audit (zizmor)
         env:
