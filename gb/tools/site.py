@@ -29,6 +29,9 @@ def main():
               ROOT / "web" / "fm1ports.js", ROOT / "web" / "fm1pkg.js"):
         shutil.copyfile(f, out / f.name)
     shutil.copyfile(base, out / "fm-gb.fwsc")
+    # the package carries three of JieLi's SDK files (Apache-2.0: LICENSING.md), so their licence goes beside it
+    shutil.copyfile(ROOT / "LICENSES" / "Apache-2.0.txt", out / "LICENSE-Apache-2.0.txt")
+    shutil.copyfile(ROOT / "LICENSE", out / "LICENSE-MPL-2.0.txt")
     words = ROOT / "gb" / "web" / "words"           # the screen reader's words (tools/build.py writes them)
     if words.is_dir():
         (out / "words").mkdir(exist_ok=True)

@@ -1,5 +1,6 @@
 # Credits
 
+- **The fm1-gb authors**: FM-GB (`gb/`), the Game Boy emulator, its FM-1 app, the ROM packers and the install page.
 - **Leo Kuroshita** ([@kurogedelic](https://github.com/kurogedelic), [Hügelton Instruments](https://hugelton.com)):
   Felucca, the firmware this base grew from, and felucca-bsp, which it is built on. Much of fm1-base is his code,
   used under MPL-2.0 with his permission ([hugelton/felucca-bsp#4](https://github.com/hugelton/felucca-bsp/issues/4)).
@@ -11,16 +12,14 @@
   (`device/boot_lzma.h`, `tools/boot_pack.py`), and the designs fm1-base's resource region (`device/res.c`,
   `tools/fm1_resources.py`, the installer's step) and pooled store (`device/storage.c` APP_STORE_POOL) follow, with
   permission.
-- **Henri David** (hdavid): the own Bluetooth stack in `bt/` and felucca-bsp's radio
-  drivers, from [Optimist](https://github.com/w0ts/optimist): BLE MIDI, pairing, the central role, and Bluetooth
-  audio (BR/EDR, Secure Simple Pairing, A2DP), written from the Bluetooth specifications and measurements of the
-  FM-1's radio. Offered under GPL-3.0-only or MPL-2.0 ([w0ts/optimist#55](https://github.com/w0ts/optimist/issues/55)),
-  used here under MPL-2.0.
+- **Henri David** (hdavid): felucca-bsp's radio drivers, from [Optimist](https://github.com/w0ts/optimist)
+  (offered under GPL-3.0-only or MPL-2.0, [w0ts/optimist#55](https://github.com/w0ts/optimist/issues/55), used under
+  MPL-2.0), and fm1-base's companion services and the SD card's streams.
+- **Julius Vitkauskas** ([m-bootloader](https://github.com/jvitkauskas/m-bootloader)): fm1-base's SD card driver, from
+  m-bootloader's SD stage, and the bootloader package the installer offers (MIT).
 - JieLi's AC79 SDK (Zhuhai Jieli Technology, Apache-2.0): the radio's calibration that felucca-bsp's
   `chip/fm1_rf_cal.h` rewrites in C, and the radio's start-up tables (`chip/ble_rf_tables_v15.h`, as M-VAVE's stock
   firmware runs them).
-- Android's Bluetooth stack (AOSP, Broadcom): the SBC encoder that Bluetooth audio sends (Apache-2.0).
-- **Kenneth MacKay**: micro-ecc, the elliptic-curve keys of Bluetooth pairing (BSD-2-Clause).
 - **Chris Farrell** ([@seajaysec](https://github.com/seajaysec)): from [fm-static](https://github.com/seajaysec/fm-static),
   the web installer's finding of an FM-1 under any port name, M-VAVE's Open firmware's identities, the package
   checksum check and the return check after resuming an update, used under MPL-2.0 with his permission
