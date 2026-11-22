@@ -7,14 +7,6 @@
 
   tools/build.py APP_DIR [--release X.Y[.Z][-suffix]] [--no-ble]
   tools/build.py APP_DIR --host        the host simulator instead: APP_DIR/build/host/NAME_host (cc, no toolchain)
-  tools/build.py APP_DIR --web         the browser emulator instead: APP_DIR/build/emu/ (emcc); the page is the
-                                       simulator alone (panel, screen, sound, screen reader), for a site to link or frame;
-                                       an app may bring its own (APP_DIR/web/emu/index.html, worklet.js)
-  tools/build.py APP_DIR --rfm1        the app as an .rfm1 instead: APP_DIR/build/rfm1/ID-dev+COMMIT.rfm1 (emcc), the
-                                       host simulator in WebAssembly for host apps (RemoteFM1 for iOS: RemoteFM1IOS's
-                                       docs/RFM1-FORMAT.md); host/rfm1.c, tools/rfm1_pack.py. With --release X.Y:
-                                       APP_DIR/build/NAME-X.Y.rfm1, beside the release's package
-
 APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
   name = "TEMPLATE"          the build's file names (lower case)
   id_prefix = "FM-1_0"       package identity: dev builds are the prefix + "00", releases the prefix + XXYYZZ
@@ -35,18 +27,10 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
                              that nothing calls or loads the chip ROM skips them
   mul64_check_skip = ["mul_f256"]   functions the note on inlined 64-bit multiplies beside loads leaves out
                              (felucca-bsp docs/CPU.md; the compiler runtime's __* are left out anyway)
-  web_cflags = ["-sX=1"]     more emcc flags for the emulator, compiling and linking (fm1-ripple: Lua's setjmp in
-                             WebAssembly itself, -sSUPPORT_LONGJMP=wasm)
-  web = ["build/web/*.c"]    units for the browser's emulator only (relative to APP_DIR, globs too): what the device
-                             loads at run time, linked in (fm1-ripple's currents)
-  web_link = ["build/web/*.a"]   archives linked into the browser's emulator as they are (relative to APP_DIR, globs
-                             too): what a firmware builds for it itself (fm1-ripple: its C++ currents, by emcc)
   vendored = ["third_party/"]   other people's libraries, compiled for the FM-1 with their machine-specific code off
                              by flags: the register check skips them entirely (it reads the text: x86 asm behind
                              an #if would fail it)
-  rfm1_memory_mib = 8        the .rfm1's fixed memory (MiB, 1..32; default 8)
-  authors = ["Name"]         the .rfm1 manifest's authors (default: author, below, else the app repository's first
-                             commit's author)
+  authors = ["Name"]         firmware.json's author when author (below) is not given, the names joined
   words = "words.tsv"        the screen reader's words (fm1-reader), relative to APP_DIR
   font_full = ["L"]          font roles with lower case too (by default M and L have capitals and digits only)
   font_trim = true           each glyph stored as its lit box only (tools/gen_font.py FM1_FONT_TRIM): the same
@@ -56,23 +40,6 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
                              then costs about 3x the instructions, which app.h's APP_FONT_CACHE gives back: that many
                              bytes of RAM (e.g. 6144u, at least the header's FONT_BOX_MAX) keep the glyphs drawn lately
                              decoded, APP_FONT_CACHE_BITS (default 7) the log2 of its slots, 6 B each
-  ble_stack_kb = 6           the Bluetooth tasks' stacks, KB each (default 8: three of them, in the pool; radio.c
-                             logs each one's deepest, "stacks", 10 s after Bluetooth is ready and as they grow)
-  ble_heap_kb = 16           its heap, KB (default 24, in RAM; the same log line's "heap": its most ever)
-  ble_trim = true            Bluetooth as a MIDI peripheral only: JieLi's central, classic and test code cut (flash and
-                             RAM: Melodee's measure ~18 KB and ~4 KB); not with ble_central
-  ble_no_pairing = true      with ble_trim: no pairing or encryption either (~19 KB more flash; iOS and macOS connect)
-  ble_central = true         and the FM-1 connects to Bluetooth MIDI devices too (FM1B_BLE_CENTRAL), beside a computer;
-                             with ble_stack = "own", 3: without pairing (no bonds, no passkey: smaller)
-  bt_audio_mem = "app"       with bt_audio: its audio packets' queue and the receptions' ring (17.7 KB) lent by the app
-                             while an AUDIO mode is on, not static RAM (FM1B_BTA_MEM; plat.h plat_bta_mem): an app
-                             whose arena gets them back while Bluetooth audio is off. Default "static"
-  bt_audio_jobs = true       with bt_audio and cpu2: the app runs the stream's SBC frames as render jobs (plat.h plat_bta_job*,
-                             FM1B_BTA_JOBS): 1,280 B more pool for the two kept frames. Off by default: the feed
-                             encodes them, and the calls do nothing. Not with cpu2_fallback
-  bt_audio_sim = true        with bt_audio: the host simulator and the browser emulator built with FM1B_BT_AUDIO, on
-                             fm1-base's stand-in for plat_bta_* (the script's "bta add NAME"); off by default, so an
-                             app keeps its own stand-in there (without FM1B_BT_AUDIO)
   usb_audio_in = true        the FM-1 recordable over USB (FM1B_UAC; the default: true)
   usb_audio_out = true       a computer plays through the FM-1 over USB (FM1B_UAC_OUT; the default: true)
   usb_audio_channels = 10    the USB audio input's channels, 4, 6, 8 or 10 (the default 2: the master alone): the master on 1 and
@@ -123,40 +90,12 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
                              app slot", also for m-bootloader's MIDI mode, which writes the area without the loader
   app_clear_end = 0xDA000    with app_end only: what an install over an app with a smaller slot erases first, [app_end,
                              app_clear_end) (the data the other app kept where this one keeps its own)
-  mirror = true              the screen and panel mirrored over USB (FM1B_MIRROR: device/mirror.c; web/mirror/,
-                             tools/fm1_mirror.py), the panel played from the host; FM1B_MIRROR=1 in the environment
-                             builds it in whatever fm1.toml says (an app's demo build), FM1B_POOL_SPARE=N the
-                             spare the build insists on (8192 B of the pool; of the SRAM with ram_layout =
-                             "packed"; 2048 B of the pool with WiFi; a demo build may spend it)
   pool_spare = 2048          the spare this app's builds insist on (8192 B, of the SRAM with ram_layout = "packed": the
                              margin for what comes next; an app that spent it on purpose says how much it keeps)
   msc = true                 disk mode: the FM-1 as a USB drive of the app's blocks (FM1B_MSC: device/msc.c, plat_disk_* in
                              plat.h; felucca-bsp usb.c FELUCCA_MSC), no USB MIDI or audio meanwhile
-  sd = true                  a microSD card and its files (FM1B_SD: device/sd.c, lib/sd_fs.c, FatFs in lib/fatfs; plat_sd_* in
-                             plat.h; felucca-bsp's fm1_sd_hw.h): a card mod, the m-card board on the FM-1 (docs/SD.md)
-  sd_read_ahead = 16         with sd: an app's read stream (plat_sd_read_open) read ahead in SPI1's interrupt, up to this many
-                             blocks (FM1B_SD_AHEAD: device/sd_ahead.h; ~544 B of the pool each), so the card streams on
-                             while the render holds the main loop up. 0 (the default): read as plat_sd_read_next asks
-  sd_clock_fine = true       with sd: the start's clock search (and the steps down after errors) through every clock SPI1
-                             has between 20 and 5 MHz (20 15 12 10 8.57 7.5 6.67 6 5; FM1B_SD_FINE), not 20 15 10 5: a
-                             board whose ceiling falls between them runs nearer it; the start tries more steps on it
-  sd_sck_hd = true           with sd: SCK driven hard during the card's sessions (felucca-bsp FM1_SD_SCK_HD; the panel
-                             keeps its drive): one FM-1 with an earlier board read right at 10 MHz with it, 8.57 without
   lcd_panel = true           the M-VAVE panel's own ST7789V setup after the reset (FM1B_LCD_PANEL: porch, gate voltages, VCOM
                              0x18, supplies, 60 Hz, gammas; device/lcd.c LCD_SEQ). Off: the init is byte-identical
-  backup = true              backup and restore of the app's saved objects over USB (FM1B_BACKUP: device/backup.c;
-                             tools/fm1_backup.py); app.h gives APP_BACKUP_OBJS, _MAGIC, _VERSION and the app_backup_* hooks
-  resources = "FILE"         the resource region (FM1B_RES: device/res.c, plat_res in plat.h; with backup): FILE (relative
-                             to APP_DIR, {gen} the generated headers' directory: an app's gen step may make it) kept out
-                             of the image in app.h's APP_RES_BASE (a number), APP_RES_SECTORS. The package carries it and
-                             the update loader writes it after the app, from any host; build/NAME-res.bin beside the
-                             package is for the host's own write (tools/fm1_resources.py, fm1_install.py and the
-                             installer page: a region there already answers at once); the host and web builds have it
-                             compiled in. resources_what (and
-                             resources_what_ja): what it holds, in the installer's words ("the 909 cymbals")
-  companion = true           the companion services over USB (FM1B_COMPANION: device/companion.c, docs/COMPANION.md;
-                             tools/fm1_companion.py): what the firmware is and has, its files and its parameters, for
-                             the site's companion/ page or a tool; the browser emulator gets its part "port" with it
   cpu2 = true                the second core (FM1B_CPU2: device/cpu2.c, plat_cpu2_* in plat.h, on felucca-bsp's
                              chip/fm1_cpu1.*): a worker for a part of the render. A failure of it (a misread, a
                              fault, a late job) restarts the FM-1, the reason in the crash record (Melodee's releases)
@@ -185,13 +124,6 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
                              1 KiB, the larger) is said. Each unit's optimised IR is written beside its code
                              (OUT/*.opt.ll: the indirect calls' targets, stack_ir.py). stack_bounds: an app's
                              function that calls itself at most N levels deep (its source's own bound): ["f=N", ..]
-  emu = ["midi", "data"]     the browser emulator's optional parts (--web): web/emu/parts/NAME.js on the page and
-                             NAME_worklet.js in the worklet, each file saying what it does; a part's own needs come
-                             with it; FM1B_EMU_NAME=1 for the C. "resample" (the device's 44.1 kHz to the browser's
-                             rate) is on without asking, where the page takes parts (fm1-base's page and worklet, or
-                             an app's own that load app_worklet.js and call fm1App); "-resample" leaves it out.
-                             FM1B_EMU="midi data" in the environment instead: those parts and no others ("" for
-                             none). Without any, the page, the worklet and app.wasm are what they were
   xdata2 = true              a fourth plat_data window, PLAT_XDATA2 0xFC000..0xFEFFF (FM1B_XDATA2: plat.h; Felucca's
                              globals' sectors, for an app that was a Felucca firmware); the store's objects there are
                              refused to plat_data_erase / plat_data_write
@@ -239,25 +171,6 @@ app.h); the build prints what it has.
   boot_pack = true           .ram_text and .data stored LZMA-packed (tools/boot_pack.py, Melodee's; device/boot_lzma.h): the
                              boot unpacks them, the decoder's tables in the pool before it is cleared (about 9 KB of
                              flash back on a large app)
-  ble_stack = "own"          with ble: Optimist's own Bluetooth stack (bt/: Henri David's, docs/bt/BLE-STACK.md;
-                             FM1B_BLE_OWN) instead of JieLi's libraries: nothing of the SDK's linked, no shim
-  ble_pairing = true         with ble_stack = "own": pairing and an encrypted link (LE legacy pairing, Just Works),
-                             the bond kept in OBJ_BLE; without it a pairing is refused (macOS and iOS connect anyway)
-  ble_diag = false           with ble_stack = "own": the link layer's diagnostics left out (bt/ble/ble_diag.h BLE_DIAG 0:
-                             its counters and event rings, ~2.4 KB of RAM, and the radio log's "BT ll" line); kept by default
-  ble_midi_time = true       with ble_stack = "own": Bluetooth MIDI in by the sender's time (FM1B_BLE_MIDI_TIME): each
-                             message's time sent, from its BLE-MIDI timestamp (bt/ble/ble_time.c), for plat_midi_in_t24;
-                             the transport then comes at once instead of held to the sender's time
-  ble = true                 Bluetooth MIDI (FM1B_BLE): ble/ on JieLi's BT libraries, from the AC79 SDK ($AC79_SDK);
-                             --no-ble builds without it (NAME-usb.fwsc), and the build checks nothing of JieLi's is in
-  wifi = true                WiFi (FM1B_WIFI): a station on JieLi's WiFi libraries and the SDK's lwIP (built from its
-                             sources), on the same shim (ble/shim, ble/wifi) with fm1-radio's RAM split (device/
-                             app_wifi.ld). Not with ble (yet)
-  net = ["net/stream.c"]     with wifi: the app's network code (lwIP's sockets), compiled as the SDK builds code that
-                             talks lwIP (its flags and headers), relative to APP_DIR (globs too: "tls/src/**/*.c"); it
-                             calls the platform through plat.h, runs in a task of its own (plat_net_task)
-  net_include = ["tls/inc"]  more include directories for those, relative to APP_DIR
-  net_cflags = ["-DX=0"]     more flags for those
   gen = ["tools/places.py --out {gen}/places.h"]   the app's generators, run before the build (relative to APP_DIR;
                              {gen} is the generated headers' directory, on the include path)
   asm = ["cpu1/entry.S"]     the app's own assembly units (relative to APP_DIR), assembled as felucca-bsp's are; an
@@ -299,7 +212,7 @@ are the parts this build has (printed as "parts"). A --release build of the firm
 authors), licence, tagline, description, tags, install, repo and a screenshot that passes the checks; any other
 build warns and writes the file without them.
 Outputs in APP_DIR/build/: NAME.bin (app), loader/ota.bin (update loader), NAME.fwsc (package), firmware.json
-(firmware-usb.json from --no-ble; every build writes it, --host, --web and --rfm1 too). An app in a firmware's
+(firmware-usb.json from --no-ble; every build writes it, --host too). An app in a firmware's
 repository (APP_DIR named app) also has the repository's firmware.json written, when it changes.
 
 The JieLi toolchain is Linux x86-64 only. JIELI_TOOLCHAIN points at it, or tools/setup_toolchain.sh puts the pinned
@@ -370,7 +283,7 @@ SDK_SHA256 = {
 
 PRODUCT = None                      # package identity (fm1.toml id_prefix; see main)
 VERSION = None                      # APP_VERSION for release builds (default: "DEV", device/unity.c)
-RELEASE = None                      # --release X.Y as given: the release's file names (NAME-X.Y.fwsc, NAME-X.Y.rfm1)
+RELEASE = None                      # --release X.Y as given: the release's file names (NAME-X.Y.fwsc)
 BLE = False                         # fm1.toml ble = true, unless --no-ble
 OWN = False                         # with BLE: fm1.toml ble_stack = "own" (bt/, no JieLi library)
 WIFI = False                        # fm1.toml wifi = true
@@ -418,13 +331,13 @@ def parse_conf(text, path):
 
 
 def toolchain():
-    """JIELI_TOOLCHAIN, else the pinned one tools/setup_toolchain.sh put in .toolchain/, else tools/get_toolchain.sh's"""
+    """JIELI_TOOLCHAIN, else the pinned one tools/setup_toolchain.sh put in .toolchain/, else ~/.jieli/toolchain"""
     tc = os.environ.get("JIELI_TOOLCHAIN")
     for d in ([Path(tc)] if tc else [SRC / ".toolchain" / "jieli" / "toolchain", Path.home() / ".jieli" / "toolchain"]):
         if (d / "pi32v2" / "bin" / "clang").exists():
             return d.resolve()
     raise SystemExit("JIELI_TOOLCHAIN must point at the JieLi Linux toolchain (the directory with pi32v2/ and common/; "
-                     "tools/setup_toolchain.sh pins one in .toolchain/, tools/get_toolchain.sh fetches the latest)")
+                     "tools/setup_toolchain.sh pins one in .toolchain/)")
 
 
 def use_docker():
@@ -1563,25 +1476,6 @@ def o2_objects(cc, base_flags, out):
     return [str(o) for _, o in jobs]
 
 
-def web_objects(base_flags, out):
-    """fm1.toml web = [...]: units compiled into the browser's emulator only (a firmware's plug-ins, linked in where
-    the device loads them at run time), relative to APP_DIR (globs too); their objects"""
-    files = [f for u in CONF.get("web", []) for f in (sorted(APP.glob(u)) if any(ch in u for ch in "*?[") else [APP / u])]
-    out.mkdir(parents=True, exist_ok=True)
-    jobs = [(f, out / ("web_" + "_".join(f.relative_to(APP).with_suffix("").parts) + ".o")) for f in files]
-
-    def one(job):
-        f, o = job
-        r = subprocess.run(["emcc", *base_flags, f"-I{f.parent}", "-c", str(f), "-o", str(o)], capture_output=True, text=True)
-        return r.stderr if r.returncode else ""
-    with ThreadPoolExecutor(8) as ex:
-        errs = [e for e in ex.map(one, jobs) if e]
-    if errs:
-        sys.stderr.write(errs[0])
-        raise SystemExit("build: a web unit failed")
-    return [str(o) for _, o in jobs]
-
-
 @functools.cache
 def build_id():
     """this build's sources (the app's, fm1-base's, felucca-bsp's chip/) and version, hashed: the second core's bar
@@ -1720,275 +1614,6 @@ def build_host():
     return 0
 
 
-EMU_PARTS = SRC / "web" / "emu" / "parts"
-# the parts every emulator build has unless its fm1.toml says "-NAME" (emu = ["-resample"]): resample, as many
-# computers run audio at 48 kHz, where the page would play the FM-1 off pitch (at 44.1 kHz it does nothing)
-EMU_DEFAULT = ["resample"]
-
-
-def emu_takes_parts():
-    """whether the page loads the parts: fm1-base's page and worklet do; an app's own (APP_DIR/web/emu/index.html,
-    worklet.js) only if its page loads app_worklet.js and its worklet calls fm1App (as fm1-base's)"""
-    own = APP / "web" / "emu"
-    return ((not (own / "index.html").exists() or "app_worklet.js" in (own / "index.html").read_text())
-            and (not (own / "worklet.js").exists() or "fm1App" in (own / "worklet.js").read_text()))
-
-
-def emu_parts():
-    """the browser emulator's optional parts: EMU_DEFAULT and fm1.toml emu = [...] ("-NAME" leaves a part out), or
-    FM1B_EMU="a b" in the environment (those and no others), each one web/emu/parts/NAME.js (the page's) and / or
-    NAME_worklet.js (the worklet's); a part's file may start with a line "// emu-needs: a b", parts it needs, which
-    come before it. Names are lower-case letters and digits ("parts" is the mechanism, web/emu/parts/parts.js and
-    parts_worklet.js); NAME_*.js are a part's other files. The defaults only where the page takes parts"""
-    env = os.environ.get("FM1B_EMU")
-    if env is not None:
-        asked = re.split(r"[,\s]+", env.strip())
-    else:
-        asked = list(CONF.get("emu", []))
-        if emu_takes_parts():
-            asked = EMU_DEFAULT + ["port"] * bool(CONF.get("companion")) + asked   # (the companion page reaches the
-                                                                                  # emulator through its port part)
-        else:
-            print(f"emu      not on: {' '.join(EMU_DEFAULT)} (the app's own page or worklet, APP_DIR/web/emu, takes no "
-                  "parts: its page loads no app_worklet.js, or its worklet calls no fm1App)")
-    asked = [p for p in asked if p]
-    known = sorted({m[1] for f in EMU_PARTS.glob("*.js") if (m := re.fullmatch(r"([a-z0-9]+)(_worklet)?\.js", f.name))}
-                   - {"parts"}) if EMU_PARTS.is_dir() else []
-    for p in asked:
-        if p.startswith("-") and p[1:] not in known:
-            raise SystemExit(f"fm1.toml emu: no part {p[1:]!r} to leave out (web/emu/parts has: {', '.join(known) or 'none'})")
-    off = {p[1:] for p in asked if p.startswith("-")}
-    asked = [p for p in asked if not p.startswith("-") and p not in off]
-    out = []
-
-    def needs(p):
-        got = []
-        for f in (EMU_PARTS / f"{p}.js", EMU_PARTS / f"{p}_worklet.js"):
-            if f.exists():
-                m = re.match(r"(?://[^\n]*\n){0,4}//\s*emu-needs:([^\n]*)", f.read_text())
-                got += m[1].split() if m else []
-        return got
-
-    def add(p, chain):
-        if p not in known:
-            raise SystemExit(f"fm1.toml emu: no part {p!r} (web/emu/parts has: {', '.join(known) or 'none'})")
-        if p in chain:
-            raise SystemExit(f"web/emu/parts: {' -> '.join(chain + [p])} need each other")
-        if p not in out:
-            for n in needs(p):
-                add(n, chain + [p])
-            out.append(p)
-    for p in asked:
-        add(p, [])
-    return out
-
-
-def emu_parts_out(emu, parts):
-    """the app's own part of the page and of the worklet (APP_DIR/web/emu/app.js, app_worklet.js) as they are; with
-    parts, app.js and app_worklet.js are made to load the parts (web/emu/parts/parts.js, parts_worklet.js) and the app's
-    own files under new names (app_own.js, app_own_worklet.js). What an earlier build with other parts left goes"""
-    import json
-    import shutil
-    own = {f: APP / "web" / "emu" / f for f in ("app.js", "app_worklet.js") if (APP / "web" / "emu" / f).exists()}
-    for f in ("app.js", "app_worklet.js", "app_own.js", "app_own_worklet.js"):
-        if (emu / f).exists():
-            (emu / f).unlink()
-    if (emu / "parts").exists():
-        shutil.rmtree(emu / "parts")
-    if not parts:
-        for f, src in own.items():
-            shutil.copy(src, emu / f)
-        return
-    (emu / "parts").mkdir()
-    for p in ["parts", *parts]:
-        for f in sorted(EMU_PARTS.glob(f"{p}*.js")):
-            if re.fullmatch(rf"{p}(_[a-z0-9_]+)?\.js", f.name):
-                shutil.copy(f, emu / "parts" / f.name)
-    if "app.js" in own:
-        shutil.copy(own["app.js"], emu / "app_own.js")
-    if "app_worklet.js" in own:
-        shutil.copy(own["app_worklet.js"], emu / "app_own_worklet.js")
-    page = [p for p in parts if (EMU_PARTS / f"{p}.js").exists()]
-    (emu / "app.js").write_text(
-        "// made by tools/build.py: the emulator's parts (fm1.toml emu) and the app's own part of the page\n"
-        'import { compose } from "./parts/parts.js";\n'
-        + "".join(f'import * as {p} from "./parts/{p}.js";\n' for p in page)
-        + ('import * as own from "./app_own.js";\n' if "app.js" in own else "const own = {};\n")
-        + f"export const {{ attach, message }} = compose({{ {', '.join(page)} }}, own, "
-        + f"{{ id: {json.dumps(NAME)}, name: {json.dumps(CONF.get('name', NAME))}, "
-        + f"backupExt: {json.dumps(CONF.get('backup_ext', 'bak'))} }});\n")
-    (emu / "app_worklet.js").write_text(
-        "// made by tools/build.py: the app's own part of the worklet, then the emulator's parts (fm1.toml emu)\n"
-        + ('import "./app_own_worklet.js";\n' if "app_worklet.js" in own else "")
-        + 'import "./parts/parts_worklet.js";\n'
-        + "".join(f'import "./parts/{p}_worklet.js";\n' for p in parts if (EMU_PARTS / f"{p}_worklet.js").exists()))
-    print(f"emu      parts: {' '.join(parts)}")
-
-
-def build_web():
-    """the host simulator in WebAssembly (web/emu/emu_web.c) and its page, in OUT/emu; the screen reader's voice
-    (eSpeak NG, GPL: a separate program the page loads) from an fm1-reader checkout next to fm1-base, if there"""
-    import shutil
-    emu = OUT / "emu"
-    emu.mkdir(parents=True, exist_ok=True)
-    web_inc = [f"-I{d}" for d in (SRC / "host", SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))]
-    wf = CONF.get("web_cflags", [])
-    o2_objs = o2_objects("emcc", ["-O2", "-ffp-contract=off", "-std=gnu99", "-w", "-DPLAT_HOST", "-DPLAT_WEB", *wf, *opt_flags(), *web_inc],
-                         emu / "o2")
-    o2_objs += web_objects(["-O2", "-ffp-contract=off", "-std=gnu99", "-w", "-DPLAT_HOST", "-DPLAT_WEB", *wf, *opt_flags(), *web_inc],
-                           emu / "web")
-    parts = emu_parts()
-    cmd = ["emcc", "-O2", "-ffp-contract=off", "-std=gnu99", "-Wall", "-Wno-unused-function", "-Wno-unused-parameter",
-           "-Wno-unused-variable", "-DPLAT_HOST", "-DPLAT_WEB", *opt_flags(), *(f"-DFM1B_EMU_{p.upper()}=1" for p in parts), *["-DFM1B_BLE=1"] * BLE, *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_BT_AUDIO=1"] * bta_sim(), *(bta_mem_flags() if bta_sim() else []), *["-DFM1B_WIFI=1"] * WIFI, *(f'-DAPP_VERSION="{VERSION}"',) * bool(VERSION),
-           *(f"-I{d}" for d in (SRC / "host", SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))),
-           *wf, "--no-entry", "-sSTANDALONE_WASM", "-sSTACK_SIZE=1048576", "-sINITIAL_MEMORY=33554432", "-sFILESYSTEM=0",
-           "-o", str(emu / "app.wasm"), str(SRC / "web" / "emu" / "emu_web.c"), *o2_objs,
-           *[str(f) for u in CONF.get("web_link", []) for f in (sorted(APP.glob(u)) if any(ch in u for ch in "*?[")
-                                                               else [APP / u])]]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    sys.stderr.write(r.stderr)
-    if r.returncode:
-        raise SystemExit("build: the emulator did not compile (emcc: Emscripten)")
-    # the page: the app's own (APP_DIR/web/emu/index.html, worklet.js), or fm1-base's
-    web = {f: (APP / "web" / "emu" / f if (APP / "web" / "emu" / f).exists() else SRC / "web" / "emu" / f)
-           for f in ("index.html", "worklet.js")}
-    page = web["index.html"].read_text()
-    page = page.replace("{{NAME}}", CONF.get("name", NAME)).replace("{{ID}}", NAME)
-    page = page.replace("{{PANEL_JS}}", re.sub(r"^export\s+", "", (SRC / "web" / "fm1panel.js").read_text(), flags=re.M))
-    (emu / "index.html").write_text(page)
-    shutil.copy(web["worklet.js"], emu / "worklet.js")
-    emu_parts_out(emu, parts)
-    if re.search(r"^\s*#define\s+APP_MIRROR_STATE\b", (APP / "app.h").read_text(), re.M):
-        # the live mirror (device/mirror.c's events mode): this build of the app, fed by an FM-1's events
-        live = (SRC / "web" / "emu" / "live.html").read_text().replace("{{NAME}}", CONF.get("name", NAME))
-        (emu / "live.html").write_text(live)
-        shutil.copy(SRC / "web" / "fm1ports.js", emu / "fm1ports.js")
-    shutil.copytree(SRC / "web" / "fonts", emu.parent / "fonts", dirs_exist_ok=True)   # the pages' fonts (../fonts/fonts.css), no outside host
-    # next to fm1-base, or next to the app's repository (fm1-base a submodule in it)
-    found = [p / "fm1-reader" / "web" for base in (SRC.parent, APP.parent.parent) for p in (base, base / "fm1-parent")
-             if (p / "fm1-reader" / "web").is_dir()]
-    found += [p for p in (SRC / ".toolchain" / "fm1-reader" / "web", APP.parent.parent / ".toolchain" / "fm1-reader" / "web")
-              if p.is_dir()]                                   # the pinned one (tools/setup_toolchain.sh)
-    reader = Path(os.environ.get("FM1_READER", found[0] if found else SRC.parent / "fm1-reader" / "web"))
-    if (reader / "words.js").exists() and (reader / "espeak" / "espeak.wasm").exists():
-        (emu / "reader" / "espeak").mkdir(parents=True, exist_ok=True)
-        for f in ("words.js", "tts.js", "tts_worker.js"):
-            shutil.copy(reader / f, emu / "reader" / f)
-        for f in ("espeak.js", "espeak.wasm", "LICENSE", "README.md"):
-            shutil.copy(reader / "espeak" / f, emu / "reader" / "espeak" / f)
-        (emu / "reader" / "FROM.txt").write_text(f"From fm1-reader (https://github.com/charlesvestal/fm1-reader) web/, "
-                                                 f"copied by fm1-base's tools/build.py --web.\n")
-    else:
-        print(f"emu: no fm1-reader at {reader}: the screen is read as plain text, without its voice (set FM1_READER)")
-    print(f"emu      {emu}  ({(emu / 'app.wasm').stat().st_size} B wasm)")
-    return 0
-
-
-def git(*args, cwd=None):
-    r = subprocess.run(["git", *args], cwd=cwd or APP, capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else ""
-
-
-def c_str(s):
-    """a C string literal (split by line, so a long text stays readable in the header)"""
-    def esc(t):
-        return t.replace("\\", "\\\\").replace('"', '\\"').replace("\t", "\\t").replace("?", "\\?")
-    lines = s.split("\n")
-    return " \\\n".join('"' + esc(ln) + ("\\n" if i < len(lines) - 1 else "") + '"' for i, ln in enumerate(lines))
-
-
-def build_rfm1():
-    """the host simulator in WebAssembly with host/rfm1.c's exports, packed as an .rfm1 (tools/rfm1_pack.py): the
-    manifest from fm1.toml, app.h and git; the credits and licence texts of the app, fm1-base, felucca-bsp and
-    Emscripten's runtime"""
-    out = OUT / "rfm1"
-    out.mkdir(parents=True, exist_ok=True)
-    repo = Path(git("rev-parse", "--show-toplevel") or APP.parent)
-    head = git("rev-parse", "HEAD")
-    if git("status", "--porcelain", "--untracked-files=no"):
-        print("rfm1: the app's repository has changes not committed: source_url names HEAD, which is not what was built")
-    app_name = next((m[1] for h in sorted(APP.glob("*.h"))
-                     for m in [re.search(r'^#define APP_NAME "([^"]*)"', h.read_text(errors="ignore"), re.M)] if m),
-                    CONF.get("name", NAME))
-    rid = re.sub(r"[^a-z0-9_]", "_", NAME)[:31]
-    version = VERSION or "dev+" + (head[:7] or "local")
-    url = CONF.get("repo") or re.sub(r"^git@github\.com:", "https://github.com/", git("remote", "get-url", "origin"))
-    url = re.sub(r"\.git$", "", url)
-    source_url = f"{url}@{head}" if head else url
-    base_head = git("rev-parse", "HEAD", cwd=SRC)
-    emver = subprocess.run(["emcc", "--version"], capture_output=True, text=True).stdout.splitlines()[0]
-    emver = re.search(r"\) ([0-9][^ ]*)", emver)[1] if re.search(r"\) ([0-9][^ ]*)", emver) else emver
-    authors = CONF.get("authors") or ([CONF["author"]] if CONF.get("author") else None)
-    authors = authors or [a for a in [git("log", "--reverse", "--format=%an", cwd=repo).split("\n")[0]] if a]
-    mem = int(CONF.get("rfm1_memory_mib", 8))
-    if not 1 <= mem <= 32:
-        raise SystemExit(f"fm1.toml rfm1_memory_mib {mem}: 1 .. 32")
-    # credits: the app's (CREDITS.md, or fm1.toml credits), then fm1-base's
-    credits = []
-    if (repo / "CREDITS.md").exists():
-        credits.append((repo / "CREDITS.md").read_text().strip())
-    elif CONF.get("credits"):
-        credits.append(f"{app_name}: {CONF['credits']}")
-    credits.append((SRC / "CREDITS.md").read_text().strip())
-    credits = "\n\n".join(credits) + "\n"
-    (out / "credits.txt").write_text(credits)
-    licence = CONF.get("licence", "MPL-2.0")
-    (GEN / "rfm1_info.h").write_text(
-        "/* tools/build.py --rfm1: the descriptor's strings (the manifest's) */\n"
-        f"#define RFM1_ID {c_str(rid)}\n#define RFM1_NAME {c_str(app_name)}\n#define RFM1_VERSION {c_str(version)}\n"
-        f"#define RFM1_SOURCE_URL {c_str(source_url)}\n#define RFM1_LICENSE {c_str(licence)}\n"
-        f"#define RFM1_CREDITS \\\n{c_str(credits)}\n")
-    # the licence texts: the app's, fm1-base's, felucca-bsp's, Emscripten's (its runtime and musl are compiled in)
-    lic = []
-    for f in [repo / "LICENSE", repo / "COPYING", *sorted((repo / "LICENSES").glob("*")), repo / "LICENSING.md"]:
-        if f.is_file():
-            lic.append((f"{app_name}: {f.relative_to(repo)}", f))
-    lic += [("fm1-base: LICENSE (MPL-2.0)", SRC / "LICENSE"), ("felucca-bsp: LICENSE", BSP / "LICENSE")]
-    em_root = subprocess.run(["em-config", "EMSCRIPTEN_ROOT"], capture_output=True, text=True).stdout.strip()
-    em_lic = next((d / "LICENSE" for d in (Path(em_root), Path(em_root).parent) if em_root and (d / "LICENSE").exists()), None)
-    if em_lic:
-        lic.append(("Emscripten (its runtime, compiled in): LICENSE", em_lic))
-        musl = Path(em_root) / "system" / "lib" / "libc" / "musl" / "COPYRIGHT"
-        if musl.exists():
-            lic.append(("musl libc (in Emscripten's runtime): COPYRIGHT", musl))
-    else:
-        print("rfm1: Emscripten's LICENSE not found (em-config EMSCRIPTEN_ROOT): the file goes without it")
-    lic = [(n, f) for n, f in lic if f.is_file()]
-    feats = ["-mcpu=mvp", "-msign-ext", "-mnontrapping-fptoint", "-mbulk-memory", "-mmutable-globals"]   # wasm3 0.5.0's
-    inc = [f"-I{d}" for d in (SRC / "host", SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))]
-    defs = ["-DPLAT_HOST", "-DPLAT_WEB", "-DPLAT_RFM1", *opt_flags(), *["-DFM1B_BLE=1"] * BLE,
-            *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_WIFI=1"] * WIFI,
-            *(f'-DAPP_VERSION="{VERSION}"',) * bool(VERSION)]
-    o2_objs = o2_objects("emcc", [*feats, "-O2", "-ffp-contract=off", "-std=gnu99", "-w", *defs, *inc], out / "o2")
-    wasm = out / "app.wasm"
-    cmd = ["emcc", *feats, "-O2", "-ffp-contract=off", "-std=gnu99", "-Wall", "-Wno-unused-function",
-           "-Wno-unused-parameter", "-Wno-unused-variable", *defs, *inc,
-           "--no-entry", "-sSTANDALONE_WASM", "-sFILESYSTEM=0", "-sSTACK_SIZE=1048576",
-           f"-sINITIAL_MEMORY={mem << 20}", "-sALLOW_MEMORY_GROWTH=0",
-           "-o", str(wasm), str(SRC / "host" / "rfm1.c"), *o2_objs]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    sys.stderr.write(r.stderr)
-    if r.returncode:
-        raise SystemExit("build: the .rfm1 did not compile (emcc: Emscripten; rfm1_memory_mib if the data does not fit)")
-    manifest = {"rfm1": 1, "abi": 6, "id": rid, "name": app_name, "version": version, "license": licence,
-                "source_url": source_url, "authors": authors,
-                "glue_url": f"https://github.com/charlesvestal/fm1-base/tree/{base_head}" if base_head else None,
-                "built_by": f"fm1-base {base_head[:7]} tools/build.py --rfm1, emcc {emver}", "memory_mib": mem}
-    manifest = {k: v for k, v in manifest.items() if v}
-    import json
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
-    # a release's beside its package, named as it is (NAME-X.Y.rfm1); a dev build's in rfm1/ with the commit
-    dst = OUT / f"{STEM}-{RELEASE}.rfm1" if RELEASE else out / f"{rid}-{version}.rfm1"
-    r = subprocess.run([sys.executable, str(SRC / "tools" / "rfm1_pack.py"), str(wasm), str(dst),
-                        "--manifest", str(out / "manifest.json"), "--credits", str(out / "credits.txt"),
-                        *[a for n, f in lic for a in ("--license", f"{n}={f}")]], capture_output=True, text=True)
-    sys.stdout.write(r.stdout)
-    sys.stderr.write(r.stderr)
-    if r.returncode:
-        raise SystemExit("build: the .rfm1 is not to the format (tools/rfm1_pack.py)")
-    return 0
-
-
 def main():
     global PRODUCT, VERSION, RELEASE, APP, OUT, GEN, LDR, ROOT, CONF, NAME, BLE, OWN, WIFI, CPU2, STEM
     ap = argparse.ArgumentParser()
@@ -1997,8 +1622,6 @@ def main():
     ap.add_argument("--no-ble", action="store_true", help="without Bluetooth (fm1.toml ble = true): NAME-usb.fwsc")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     ap.add_argument("--host", action="store_true", help="build the host simulator instead of the firmware")
-    ap.add_argument("--web", action="store_true", help="build the browser emulator instead of the firmware")
-    ap.add_argument("--rfm1", action="store_true", help="build an .rfm1 (host apps) instead of the firmware")
     a = ap.parse_args()
     APP = a.app.resolve()
     CONF = read_conf(APP / "fm1.toml")
@@ -2018,10 +1641,11 @@ def main():
     CPU2 = (bool(CONF.get("cpu2")) and os.environ.get("FM1B_CPU2") != "0") or os.environ.get("FM1B_CPU2") == "1"
     if BLE and WIFI:
         raise SystemExit("fm1.toml: ble and wifi together are not supported yet (one radio a build; --no-ble for WiFi)")
-    gone = [k for k, on in (("ble", BLE), ("wifi", WIFI), ("sd", CONF.get("sd"))) if on]
-    if gone:                                      # (this repository is FM-GB's: the radios' and the card's code is not in it)
-        raise SystemExit(f"fm1.toml {', '.join(gone)}: not in this repository (FM-GB has no radio and no SD card: "
-                         "fm1-base's ble/, bt/ and lib/ are left out)")
+    gone = [k for k, on in (("ble", BLE), ("wifi", WIFI), *((k, CONF.get(k)) for k in
+                                                         ("sd", "mirror", "backup", "companion", "resources"))) if on]
+    if gone:                                      # (this repository is FM-GB's: these parts' code or tools are not in it)
+        raise SystemExit(f"fm1.toml {', '.join(gone)}: not in this repository (FM-GB has no radio, no SD card, and "
+                         "none of fm1-base's mirror, backup, companion or resource tools)")
     STEM = NAME + ("-usb" if CONF.get("ble") and not BLE else "")
     OUT = APP / "build"
     GEN, LDR = OUT / "gen", OUT / "loader"
@@ -2041,8 +1665,8 @@ def main():
         VERSION = a.release.upper()
         RELEASE = a.release
         name = f"{STEM}-{a.release}.fwsc"
-    # a release package needs firmware.json's keys; the simulator, the emulator, the .rfm1 and dev builds only warn
-    firmware_json.require(CONF, bool(a.release) and not (a.host or a.web or a.rfm1), APP / "fm1.toml", APP)
+    # a release package needs firmware.json's keys; the simulator and dev builds only warn
+    firmware_json.require(CONF, bool(a.release) and not a.host, APP / "fm1.toml", APP)
     touch = touch_app()
     input_hz()                                     # (refuses another rate early, on every build)
     words = firmware_json.words_published(APP / CONF.get("words", "words.tsv"))
@@ -2051,9 +1675,9 @@ def main():
                                                      app_dir=APP))
     for f in firmware_json.targets(APP, no_ble=bool(CONF.get("ble")) and not BLE):
         firmware_json.write(f, fw_json)        # (docs/FIRMWARE-JSON.md; a file already so is left alone)
-    if a.host or a.web or a.rfm1:
+    if a.host:
         generate()
-        return build_host() if a.host else build_web() if a.web else build_rfm1()
+        return build_host()
     fm1pkg_make.SDK = a.sdk
     for rel, sha in SDK_SHA256.items():          # fail early without the SDK
         if hashlib.sha256(fm1pkg_make.sdk_file(rel)).hexdigest() != sha:
