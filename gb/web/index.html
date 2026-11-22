@@ -13,6 +13,7 @@
   :root { color-scheme: dark; --bg: #101410; --panel: #1a211a; --line: #2c372a; --ink: #e8eee0; --dim: #9aa58f;
           --accent: #9bbc0f; --accent-ink: #0f380f; --bad: #ff8a7a; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 680px; margin: 0 auto; padding: 24px 16px 64px; }
   h1 { margin: 0 0 4px; font-size: 32px; letter-spacing: .02em; }
@@ -39,6 +40,8 @@
   details { margin-top: 10px; } summary { cursor: pointer; color: var(--dim); }
   pre { white-space: pre-wrap; font-size: 12px; color: var(--dim); max-height: 220px; overflow: auto; }
   ul { margin: 6px 0; padding-left: 20px; }
+  select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+           padding: 8px 10px; max-width: 100%; }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
   td { padding: 3px 6px; border-top: 1px solid var(--line); } td:first-child { color: var(--accent); white-space: nowrap; }
 </style>
@@ -78,6 +81,12 @@
       <li>FM-GB uses all of the FM-1's app area: another firmware's saved data there may be overwritten. Your games'
           saves are kept from one FM-GB install to the next.</li>
     </ul>
+    <div class="row" id="portrow" hidden>
+      <label for="port">MIDI port</label>
+      <select id="port"><option value="">Find it by itself</option></select>
+    </div>
+    <p class="muted" id="porthint" hidden>The FM-1 was not found under the port names it usually has: another firmware
+      may have renamed its port. Choose its port above and press Install again.</p>
     <div class="row"><button id="install" disabled>Install</button></div>
     <progress id="bar" max="100" value="0" hidden></progress>
     <p id="status" aria-live="polite"></p>
@@ -193,13 +202,33 @@ $("download").addEventListener("click", () => {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 });
 
+// the FM-1's port, chosen by hand: another firmware may have renamed it to a name the installer does not know
+const PORT_KEY = "fm-gb.port";
+const savedPort = () => { try { return localStorage.getItem(PORT_KEY) || ""; } catch (_) { return ""; } };
+const savePort = (v) => { try { v ? localStorage.setItem(PORT_KEY, v) : localStorage.removeItem(PORT_KEY); } catch (_) { /* none */ } };
+let midi = null;
+function fillPorts() {
+  if (!midi) return;
+  const sel = $("port"), want = sel.value || savedPort();
+  const names = new Updater(midi).ports();
+  if (want && !names.includes(want)) names.push(want);
+  sel.replaceChildren(new Option("Find it by itself", ""), ...names.map((n) => new Option(n, n)));
+  sel.value = want;
+  $("portrow").hidden = false;
+}
+$("port").addEventListener("change", () => { savePort($("port").value); $("porthint").hidden = true; });
+
 window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = ""; } });
 
 $("install").addEventListener("click", async () => {
   if (!made || writing) return;
-  let midi;
-  try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
-  catch (_) { $("status").innerHTML = '<span class="bad">MIDI access was refused: allow it (with SysEx) for this page and try again.</span>'; return; }
+  if (!midi) {
+    try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
+    catch (_) { $("status").innerHTML = '<span class="bad">MIDI access was refused: allow it (with SysEx) for this page and try again.</span>'; return; }
+    midi.addEventListener("statechange", () => fillPorts());
+    fillPorts();
+  }
+  $("porthint").hidden = true;
   const product = productOf(made), img = logicalImage(made);
   writing = true; ready();
   $("bar").hidden = false; $("bar").value = 0;
@@ -214,6 +243,8 @@ $("install").addEventListener("click", async () => {
     if (k === "done") { $("bar").value = 100; say(`Installed: ${a}. Have fun!`); }
   };
   const up = new Updater(midi, log);
+  const picked = $("port").value;
+  if (picked) { up.allow(picked); log(`port chosen: ${picked}`); }
   try {
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {                                      /* already in update mode (an install that stopped): go on */
@@ -226,6 +257,11 @@ $("install").addEventListener("click", async () => {
   } catch (e) {
     say(e && e.message ? e.message : String(e));
     log(String(e && e.stack || e));
+    if (e && e.code === "notfound") {
+      log(`ports: ${up.ports().join(", ") || "none"}`);
+      fillPorts();
+      if (!picked) $("porthint").hidden = false;
+    }
   }
   writing = false; ready();
 });
