@@ -2018,6 +2018,10 @@ def main():
     CPU2 = (bool(CONF.get("cpu2")) and os.environ.get("FM1B_CPU2") != "0") or os.environ.get("FM1B_CPU2") == "1"
     if BLE and WIFI:
         raise SystemExit("fm1.toml: ble and wifi together are not supported yet (one radio a build; --no-ble for WiFi)")
+    gone = [k for k, on in (("ble", BLE), ("wifi", WIFI), ("sd", CONF.get("sd"))) if on]
+    if gone:                                      # (this repository is FM-GB's: the radios' and the card's code is not in it)
+        raise SystemExit(f"fm1.toml {', '.join(gone)}: not in this repository (FM-GB has no radio and no SD card: "
+                         "fm1-base's ble/, bt/ and lib/ are left out)")
     STEM = NAME + ("-usb" if CONF.get("ble") and not BLE else "")
     OUT = APP / "build"
     GEN, LDR = OUT / "gen", OUT / "loader"

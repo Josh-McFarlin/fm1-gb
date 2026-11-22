@@ -174,4 +174,4 @@ if want fm1-reader && [ ! -f ../fm1-reader/web/words.js ]; then
     checkout $TC/fm1-reader "$1" "$2" "$3"
 fi
 
-echo "setup_toolchain: done in $ROOT (tools/build.py APP_DIR, tests/run_tests.sh, tools/osv_scan.sh)"
+echo "setup_toolchain: done in $ROOT (tools/build.py gb, gb/tests/run.sh, tools/osv_scan.sh)"
